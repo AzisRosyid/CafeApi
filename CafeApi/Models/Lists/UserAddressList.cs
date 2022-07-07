@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using static CafeApi.Models.Enum.UserAddressEnum;
+using static CafeApi.Models.Enums.UserAddressEnum;
 
-namespace CafeApi.Models.List
+namespace CafeApi.Models.Lists
 {
     public class UserAddressList
     {

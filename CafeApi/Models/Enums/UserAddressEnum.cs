@@ -1,7 +1,7 @@
 ﻿using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
 
-namespace CafeApi.Models.Enum
+namespace CafeApi.Models.Enums
 {
     public class UserAddressEnum
     {

@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc.ModelBinding;
 using System.ComponentModel.DataAnnotations;
 
-namespace CafeApi.Models.Parameter
+namespace CafeApi.Models.Parameters
 {
     public class LoginParameter
     {

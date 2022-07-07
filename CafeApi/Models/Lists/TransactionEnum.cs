@@ -1,7 +1,7 @@
 ﻿using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
 
-namespace CafeApi.Models.List
+namespace CafeApi.Models.Lists
 {
     public class TransactionEnum
     {

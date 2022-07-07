@@ -6,13 +6,14 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using CafeApi.Models;
-using CafeApi.Models.List;
-using static CafeApi.Models.Enum.UserEnum;
-using static CafeApi.Models.Enum.OrderEnum;
-using static CafeApi.Models.Enum.UserAddressEnum;
-using CafeApi.Models.Parameter;
-using static CafeApi.Models.Enum.CoinEnum;
-using static CafeApi.Models.Enum.DeleteEnum;
+using CafeApi.Models.Lists;
+using static CafeApi.Models.Enums.UserEnum;
+using static CafeApi.Models.Enums.OrderEnum;
+using static CafeApi.Models.Enums.UserAddressEnum;
+using CafeApi.Models.Parameters;
+using static CafeApi.Models.Enums.CoinEnum;
+using static CafeApi.Models.Enums.DeleteEnum;
+using CafeApi.Controllers.Helpers;
 
 namespace CafeApi.Controllers
 {
@@ -35,7 +36,7 @@ namespace CafeApi.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<IEnumerable<User>>> GetUsers(int? page = 1, int? pick = 20, string search = "", UserRole? role = null, UserGender? gender = null, UserType? type = null, UserStatus? status = null, Delete? deleted = null, UserSort? sort = null, Order? order = null, DateTime? createStart = null, DateTime? createEnd = null, DateTime? updateStart = null, DateTime? updateEnd = null, bool android = false)
         {
-            var valid = Method.Decode(auth());
+            var valid = Method.valid(auth());
             if (!valid.IsValid) return StatusCode(401, new { errors = "Access Unauthorized!" }); 
             if (valid.Role != UserRole.Admin) return StatusCode(403, new { errors = "User Role must be Admin!" }); 
 
@@ -51,7 +52,7 @@ namespace CafeApi.Controllers
 
             userIds.AddRange(users); userIds.AddRange(addresses);
             var userIdCom = new List<long>(); userIdCom.AddRange(userIds); userIds.Clear();
-            foreach(var i in userIdCom) if (!userIds.Any(s => s == i)) userIds.Add(i);
+            foreach (var i in userIdCom) if (!userIds.Any(s => s == i)) userIds.Add(i); 
 
             foreach (var i in userIds)
             {
@@ -152,7 +153,7 @@ namespace CafeApi.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<User>> GetUser(long id)
         {
-            var valid = Method.Decode(auth());
+            var valid = Method.valid(auth());
             if (!valid.IsValid) return StatusCode(401, new { errors = "Access Unauthorized!" }); 
             if (valid.Role != UserRole.Admin) return StatusCode(403, new { errors = "User Role must be Admin!" });
             if (!UserExists(id)) return StatusCode(404, new { errors = "User Not Found!" });
@@ -177,24 +178,29 @@ namespace CafeApi.Controllers
                 Status = (UserAddressStatus)s.Status,
             }).ToList();
 
-            return Ok(new UserList
+            var result = new
             {
-                Id = user.Id,
-                Name = user.Name,
-                Email = user.Email,
-                Type = (UserType)user.Type,
-                Role = (UserRole)user.Role,
-                Gender = (UserGender)user.Gender,
-                DateOfBirth = user.DateOfBirth,
-                PhoneNumber = user.PhoneNumber,
-                Address = userAddresses,
-                Image = user.Image,
-                Coins = coins,
-                Status = (UserStatus)user.Status,
-                DateCreated = user.DateCreated,
-                DateUpdated = user.DateUpdated,
-                DateDeleted = user.DateDeleted
-            });
+                User = new UserList
+                {
+                    Id = user.Id,
+                    Name = user.Name,
+                    Email = user.Email,
+                    Type = (UserType)user.Type,
+                    Role = (UserRole)user.Role,
+                    Gender = (UserGender)user.Gender,
+                    DateOfBirth = user.DateOfBirth,
+                    PhoneNumber = user.PhoneNumber,
+                    Address = userAddresses,
+                    Image = user.Image,
+                    Coins = coins,
+                    Status = (UserStatus)user.Status,
+                    DateCreated = user.DateCreated,
+                    DateUpdated = user.DateUpdated,
+                    DateDeleted = user.DateDeleted
+                }
+            };
+
+            return Ok(result);
         }
 
         // PUT: api/Users/5
@@ -208,7 +214,7 @@ namespace CafeApi.Controllers
         [ProducesResponseType(StatusCodes.Status409Conflict)]
         public async Task<IActionResult> PutUser(long id, [FromForm] UserParameter userParameter)
         {
-            var valid = Method.Decode(auth());
+            var valid = Method.valid(auth());
             if (!valid.IsValid) return StatusCode(401, new { errors = "Access Unauthorized!" });
             if (valid.Role != UserRole.Admin) return StatusCode(403, new { errors = "User Role must be Admin!" });
             if (!ModelState.IsValid) return BadRequest(Method.error(ModelState));
@@ -277,9 +283,7 @@ namespace CafeApi.Controllers
         [ProducesResponseType(StatusCodes.Status409Conflict)]
         public async Task<ActionResult<User>> PostUser([FromForm] UserParameter userParameter)
         {
-            
-
-            var valid = Method.Decode(auth());
+            var valid = Method.valid(auth());
             if (!valid.IsValid) return StatusCode(401, new { errors = "Access Unauthorized!" }); 
             if (valid.Role != UserRole.Admin) return StatusCode(403, new { errors = "User Role must be Admin!" }); 
             if (!ModelState.IsValid) return BadRequest(Method.error(ModelState)); 
@@ -342,7 +346,7 @@ namespace CafeApi.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> DeleteUser(long id)
         {
-            var valid = Method.Decode(auth());
+            var valid = Method.valid(auth());
             if (!valid.IsValid) return StatusCode(401, new { errors = "Access Unauthorized!" }); 
             if (valid.Role != UserRole.Admin) return StatusCode(403, new { errors = "User Role must be Admin!" }); 
             if (!UserExists(id)) NotFound(new { errors = "User Not Found!" });

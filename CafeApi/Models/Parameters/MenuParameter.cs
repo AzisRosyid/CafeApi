@@ -1,8 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc.ModelBinding;
 using System.ComponentModel.DataAnnotations;
-using static CafeApi.Models.Enum.MenuContentEnum;
+using static CafeApi.Models.Enums.MenuContentEnum;
 
-namespace CafeApi.Models.Parameter
+namespace CafeApi.Models.Parameters
 {
     public class MenuParameter
     {

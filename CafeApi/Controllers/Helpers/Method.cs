@@ -1,15 +1,16 @@
 ﻿using CafeApi.Models;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.IdentityModel.Tokens;
+using static CafeApi.Models.Enums.UserEnum;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text;
+using System.Security.Cryptography;
 using System.Text.Json;
-using static CafeApi.Models.Enum.UserEnum;
+using ImageMagick;
+using static System.Net.Mime.MediaTypeNames;
 
-namespace CafeApi
+namespace CafeApi.Controllers.Helpers
 {
     public class Method
     {
@@ -45,7 +46,7 @@ namespace CafeApi
 
         public static object error(ModelStateDictionary st) => new { errors = st.Values.SelectMany(s => s.Errors).Select(s => s.ErrorMessage).FirstOrDefault() };
 
-        public static string Encode(User user, bool st)
+        public static string token(User user, bool st)
         {
             var handler = new JwtSecurityTokenHandler();
             var key = Encoding.UTF8.GetBytes(secret);
@@ -72,7 +73,7 @@ namespace CafeApi
             return handler.WriteToken(token);
         }
 
-        public static Valid Decode(string token)
+        public static Valid valid(string token)
         {
             try
             {
@@ -100,6 +101,37 @@ namespace CafeApi
             catch
             {
                 return new Valid { IsValid = false };
+            }
+        }
+
+        public File? saveImage(string path)
+        {
+            try
+            {
+                var info = new FileInfo(path);
+                string copyPath = String.Empty;
+                if (quality == ImageQuality.Medium) copyPath = $"{Method.imgBookPath}Medium/";
+                if (quality == ImageQuality.Low) copyPath = $"{Method.imgBookPath}Low/";
+                if (!Directory.Exists(copyPath)) Directory.CreateDirectory(copyPath);
+                copyPath = $"{copyPath}{image}";
+                if (!File.Exists(copyPath)) info.CopyTo(copyPath, true);
+                else return File(File.ReadAllBytes(copyPath), "image/jpeg");
+                var copy = new FileInfo(copyPath);
+                ImageOptimizer opt = new ImageOptimizer();
+                opt.LosslessCompress(copy);
+                copy.Refresh();
+                using (var img = new MagickImage(copy.FullName))
+                {
+                    if (quality == ImageQuality.Medium) img.Scale(img.Width / 2, 0);
+                    else if (quality == ImageQuality.Low) img.Scale(img.Width / 3, 0);
+                    img.Write(copy);
+                }
+                info = copy;
+                return File(File.ReadAllBytes(info.FullName), "image/jpeg");
+            }
+            catch
+            {
+                return null;
             }
         }
     }

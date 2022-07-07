@@ -1,11 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using CafeApi.Models.Parameters;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using static CafeApi.Models.Enums.UserEnum;
 using System.ComponentModel.DataAnnotations;
-using static CafeApi.Models.Enum.UserEnum;
 
-namespace CafeApi.Models.Parameter
+namespace CafeApi.Models.Parameters
 {
-    public class UserParameter
+    public class RegisterParameter
     {
         [BindRequired]
         [Required]
@@ -27,11 +27,6 @@ namespace CafeApi.Models.Parameter
         [Required]
         [EnumDataType(typeof(UserType))]
         public UserType Type { get; set; }
-
-        [BindRequired]
-        [Required]
-        [EnumDataType(typeof(UserRole))]
-        public UserRole Role { get; set; }
 
         [BindRequired]
         [Required]

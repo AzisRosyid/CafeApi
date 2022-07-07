@@ -1,4 +1,4 @@
-﻿namespace CafeApi.Models.List
+﻿namespace CafeApi.Models.Lists
 {
     public class MenuList
     {

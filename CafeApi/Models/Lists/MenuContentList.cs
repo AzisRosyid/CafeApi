@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using static CafeApi.Models.Enum.MenuContentEnum;
+using static CafeApi.Models.Enums.MenuContentEnum;
 
-namespace CafeApi.Models.List
+namespace CafeApi.Models.Lists
 {
     public class MenuContentList
     {

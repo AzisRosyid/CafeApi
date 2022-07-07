@@ -1,14 +1,15 @@
-﻿using CafeApi.Models;
-using CafeApi.Models.List;
-using CafeApi.Models.Parameter;
+﻿using CafeApi.Controllers.Helpers;
+using CafeApi.Models;
+using CafeApi.Models.Lists;
+using CafeApi.Models.Parameters;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
-using static CafeApi.Models.Enum.CoinEnum;
-using static CafeApi.Models.Enum.UserAddressEnum;
-using static CafeApi.Models.Enum.UserEnum;
+using static CafeApi.Models.Enums.CoinEnum;
+using static CafeApi.Models.Enums.UserAddressEnum;
+using static CafeApi.Models.Enums.UserEnum;
 
 namespace CafeApi.Controllers
 {
@@ -28,7 +29,7 @@ namespace CafeApi.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> MyProfile()
         {
-            var valid = Method.Decode(auth());
+            var valid = Method.valid(auth());
             if (!valid.IsValid) return Unauthorized(new { errors = "Access Unauthorized!" });
 
             var user = _context.Users.Where(s => s.Id == valid.Id).FirstOrDefault();
@@ -51,24 +52,29 @@ namespace CafeApi.Controllers
                 Status = (UserAddressStatus)s.Status,
             }).ToList();
 
-            return Ok(new UserList
+            var result = new
             {
-                Id = user.Id,
-                Name = user.Name,
-                Email = user.Email,
-                Type = (UserType)user.Type,
-                Role = (UserRole)user.Role,
-                Gender = (UserGender)user.Gender,
-                DateOfBirth = user.DateOfBirth,
-                PhoneNumber = user.PhoneNumber,
-                Address = userAddresses,
-                Image = user.Image,
-                Coins = coins,
-                Status = (UserStatus)user.Status,
-                DateCreated = user.DateCreated,
-                DateUpdated = user.DateUpdated,
-                DateDeleted = user.DateDeleted
-            });
+                MyProfile = new UserList
+                {
+                    Id = user.Id,
+                    Name = user.Name,
+                    Email = user.Email,
+                    Type = (UserType)user.Type,
+                    Role = (UserRole)user.Role,
+                    Gender = (UserGender)user.Gender,
+                    DateOfBirth = user.DateOfBirth,
+                    PhoneNumber = user.PhoneNumber,
+                    Address = userAddresses,
+                    Image = user.Image,
+                    Coins = coins,
+                    Status = (UserStatus)user.Status,
+                    DateCreated = user.DateCreated,
+                    DateUpdated = user.DateUpdated,
+                    DateDeleted = user.DateDeleted
+                }
+            };
+
+            return Ok(result);
         }
 
         [HttpGet("Bookmark/{menuId}")]
@@ -77,7 +83,7 @@ namespace CafeApi.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Bookmark(long menuId)
         {
-            var valid = Method.Decode(auth());
+            var valid = Method.valid(auth());
             if (!valid.IsValid) return Unauthorized(new { errors = "Access Unauthorized!" }); 
             if (!_context.Menus.Any(s => s.Id == menuId)) { return NotFound(new { errors = "Menu Not Found!" }); }
 
@@ -113,7 +119,7 @@ namespace CafeApi.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Like(long menuId)
         {
-            var valid = Method.Decode(auth());
+            var valid = Method.valid(auth());
             if (!valid.IsValid) return Unauthorized(new { errors = "Access Unauthorized!" });
             if (!_context.Menus.Any(s => s.Id == menuId)) { return NotFound(new { errors = "Menu Not Found!" }); }
 
@@ -147,9 +153,9 @@ namespace CafeApi.Controllers
         [ProducesResponseType(typeof(string), 200)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> Like(long transactionDetailId, [BindRequired][Required][RegularExpression(@"^\d+(\.\d{1,1})?$")][Range(1.0, 5.0)] decimal rating, string? description = null, bool delete = false)
+        public async Task<IActionResult> Review(long transactionDetailId, [BindRequired][Required][RegularExpression(@"^\d+(\.\d{1,1})?$")][Range(1.0, 5.0)] decimal rating, string? description = null, bool delete = false)
         {
-            var valid = Method.Decode(auth());
+            var valid = Method.valid(auth());
             if (!valid.IsValid) return Unauthorized(new { errors = "Access Unauthorized!" });
             if (!ModelState.IsValid) return BadRequest(Method.error(ModelState));
             if (!_context.TransactionDetails.Any(s => s.Id == transactionDetailId)) { return NotFound(new { errors = "Transaction Detail Id Not Found!" }); }
@@ -189,9 +195,9 @@ namespace CafeApi.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status409Conflict)]
-        public async Task<IActionResult> PutUser([FromForm] UserParameter userParameter)
+        public async Task<IActionResult> UpdateProfile([FromForm] UserParameter userParameter)
         {
-            var valid = Method.Decode(auth());
+            var valid = Method.valid(auth());
             if (!valid.IsValid) return StatusCode(401, new { errors = "Access Unauthorized!" });
             if (!ModelState.IsValid) return BadRequest(Method.error(ModelState));
             if (userParameter.Addresses != null && userParameter.Addresses.Status != null) foreach (var i in userParameter.Addresses.Status) foreach (var j in userParameter.Addresses.Status) if (i == j) return Conflict(new { errors = "Addresses Status cannot same each other!" });
@@ -254,9 +260,9 @@ namespace CafeApi.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
-        public async Task<IActionResult> DeleteUser()
+        public async Task<IActionResult> DeleteProfile()
         {
-            var valid = Method.Decode(auth());
+            var valid = Method.valid(auth());
             if (!valid.IsValid) return StatusCode(401, new { errors = "Access Unauthorized!" });
 
             var user = await _context.Users.FindAsync(valid.Id);

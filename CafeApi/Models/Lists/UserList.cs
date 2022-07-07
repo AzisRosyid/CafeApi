@@ -1,9 +1,9 @@
-﻿using CafeApi.Models.Parameter;
+﻿using CafeApi.Models.Parameters;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using System.ComponentModel.DataAnnotations;
-using static CafeApi.Models.Enum.UserEnum;
+using static CafeApi.Models.Enums.UserEnum;
 
-namespace CafeApi.Models.List
+namespace CafeApi.Models.Lists
 {
     public class UserList
     {

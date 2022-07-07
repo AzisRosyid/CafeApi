@@ -6,13 +6,14 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using CafeApi.Models;
-using static CafeApi.Models.Enum.UserEnum;
-using CafeApi.Models.Parameter;
-using static CafeApi.Models.Enum.MenuContentEnum;
-using CafeApi.Models.List;
-using static CafeApi.Models.Enum.MenuEnum;
-using static CafeApi.Models.Enum.DeleteEnum;
-using static CafeApi.Models.Enum.OrderEnum;
+using static CafeApi.Models.Enums.UserEnum;
+using CafeApi.Models.Parameters;
+using static CafeApi.Models.Enums.MenuContentEnum;
+using CafeApi.Models.Lists;
+using static CafeApi.Models.Enums.MenuEnum;
+using static CafeApi.Models.Enums.DeleteEnum;
+using static CafeApi.Models.Enums.OrderEnum;
+using CafeApi.Controllers.Helpers;
 
 namespace CafeApi.Controllers
 {
@@ -33,7 +34,7 @@ namespace CafeApi.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<IEnumerable<Menu>>> GetMenus(int? page = 1, int? pick = 20, string search = "", long? categoryId = null, double? minPrice = null, double? maxPrice = null, decimal? minRating = null, decimal? maxRating = null, MenuType? type = null, bool soldOut = false, Delete? deleted = null, MenuSort? sort = null, Order? order = null, DateTime? createStart = null, DateTime? createEnd = null, DateTime? updateStart = null, DateTime? updateEnd = null, bool android = false)
         {
-            var valid = Method.Decode(auth());
+            var valid = Method.valid(auth());
 
             var st = new List<MenuList>();
             var menuIds = new List<long>();
@@ -45,7 +46,7 @@ namespace CafeApi.Controllers
             void comMenu()
             {
                 var menuIdCom = new List<long>(); menuIdCom.AddRange(menuIds); menuIds.Clear();
-                foreach (var i in menuIdCom) if (!menuIds.Any(s => s == i)) menuIdCom.Add(i);
+                foreach (var i in menuIdCom) if (!menuIds.Any(s => s == i)) menuIds.Add(i); 
             }
 
             void getMenu(string search)
@@ -54,10 +55,12 @@ namespace CafeApi.Controllers
                           join t in _context.Categories on s.CategoryId equals t.Id
                           where t.Id.ToString().Contains(search) || t.ParentId.ToString().Contains(search) || t.Name.Contains(search)
                           select s.Id;
-                var st2 = _context.Menus.Where(s => _context.TransactionDetails.Where(s => s.MenuId == s.Id).Sum(s => s.Quantity).ToString().Contains(search)).Select(s => s.Id);
+                var st2 = _context.Menus.Where(s => _context.Transactions.Join(_context.TransactionDetails, s => s.Id, t => t.Id, (s, t) => new {s, t}).Where(x => x.t.MenuId == s.Id && x.s.UserId == valid.Id).Sum(x => x.t.Quantity).ToString().Contains(search)).Select(s => s.Id);
+                int? type = null;
+                try { type = (int)(MenuContentType)Enum.Parse(typeof(MenuContentType), search, true); } catch { }
                 var st3 = from s in _context.Menus
                           join t in _context.MenuContents on s.Id equals t.MenuId
-                          where t.Id.ToString().Contains(search) || ((MenuContentType)t.Type).ToString().Contains(search) || t.TypeOrder.ToString().Contains(search) || t.Value.Contains(search)
+                          where t.Id.ToString().Contains(search) || t.Type == type || t.TypeOrder.ToString().Contains(search) || t.Value.Contains(search)
                           select s.Id;
                 var st4 = _context.Menus.Where(s => s.Id.ToString().Contains(search) || s.CategoryId.ToString().Contains(search) || s.Name.Contains(search) || s.Price.ToString().Contains(search) || s.Stock.ToString().Contains(search) || s.DateCreated.ToString().Contains(search) || s.DateUpdated.ToString().Contains(search) || s.DateDeleted.ToString().Contains(search)).Select(s => s.Id);
 
@@ -70,10 +73,12 @@ namespace CafeApi.Controllers
                 var st = _context.Categories.Where(s => s.ParentId == id).Select(s => s.Id);
                 foreach (var search in searchList)
                 {
+                    int? type = null;
+                    try { type = (int)(MenuContentType)Enum.Parse(typeof(MenuContentType), search, true); } catch { }
                     var ids = from s in _context.Menus
                               join t in _context.MenuContents on s.Id equals t.MenuId
                               join c in _context.Categories on s.CategoryId equals c.Id
-                              where (s.Id.ToString().Contains(search) || s.CategoryId.ToString().Contains(search) || s.Name.Contains(search) || s.Price.ToString().Contains(search) || s.Stock.ToString().Contains(search) || s.DateCreated.ToString().Contains(search) || s.DateUpdated.ToString().Contains(search) || s.DateDeleted.ToString().Contains(search) || t.Id.ToString().Contains(search) || ((MenuContentType)t.Type).ToString().Contains(search) || t.TypeOrder.ToString().Contains(search) || t.Value.Contains(search) || c.Id.ToString().Contains(search) || c.ParentId.ToString().Contains(search) || c.Name.Contains(search) || _context.TransactionDetails.Where(s => s.MenuId == s.Id).Sum(s => s.Quantity).ToString().Contains(search)) && s.CategoryId == id
+                              where (s.Id.ToString().Contains(search) || s.CategoryId.ToString().Contains(search) || s.Name.Contains(search) || s.Price.ToString().Contains(search) || s.Stock.ToString().Contains(search) || s.DateCreated.ToString().Contains(search) || s.DateUpdated.ToString().Contains(search) || s.DateDeleted.ToString().Contains(search) || t.Id.ToString().Contains(search) || t.Type == type || t.TypeOrder.ToString().Contains(search) || t.Value.Contains(search) || c.Id.ToString().Contains(search) || c.ParentId.ToString().Contains(search) || c.Name.Contains(search) || _context.Transactions.Join(_context.TransactionDetails, s => s.Id, t => t.Id, (s, t) => new { s, t }).Where(x => x.t.MenuId == s.Id && x.s.UserId == valid.Id).Sum(x => x.t.Quantity).ToString().Contains(search)) && s.CategoryId == id
                               select s.Id;
                     menuIds.AddRange(ids);
                     comMenu();
@@ -89,7 +94,7 @@ namespace CafeApi.Controllers
             {
                 var menu = await _context.Menus.FindAsync(i);
                 CategoryList? category = null;
-                if (menu.CategoryId.HasValue) category = await _context.Categories.Where(s => s.Id == menu.CategoryId && s.DateDeleted == null).Select(s => new CategoryList
+                category = await _context.Categories.Where(s => s.Id == menu.CategoryId && s.DateDeleted == null).Select(s => new CategoryList
                 {
                     Id = s.Id,
                     ParentId = s.ParentId,
@@ -97,6 +102,10 @@ namespace CafeApi.Controllers
                     DateCreated = s.DateCreated,
                     DateUpdated = s.DateUpdated
                 }).FirstOrDefaultAsync();
+
+                var rat = _context.TransactionDetails.Join(_context.Reviews, s => s.Id, t => t.TransactionDetailId, (s, t) => new { s, t }).Where(st => st.s.MenuId == menu.Id);
+                decimal? rating = null;
+                if (rat.Any()) rating = rat.Average(st => st.t.Rating);
 
                 st.Add(new MenuList
                 {
@@ -106,7 +115,7 @@ namespace CafeApi.Controllers
                     Price = menu.Price,
                     Stock = menu.Stock,
                     Sold = _context.TransactionDetails.Where(s => s.MenuId == menu.Id).Sum(s => s.Quantity),
-                    Images = _context.MenuContents.Where(s => s.Type == (int)MenuContentType.Image && s.DateDeleted == null).Select(s => new MenuContentList
+                    Images = _context.MenuContents.Where(s => s.Type == (int)MenuContentType.Image && s.MenuId == menu.Id && s.DateDeleted == null).Select(s => new MenuContentList
                     {
                         Id = s.Id,
                         MenuId = s.MenuId,
@@ -116,7 +125,7 @@ namespace CafeApi.Controllers
                         DateCreated = s.DateCreated,
                         DateUpdated = s.DateUpdated
                     }).ToList(),
-                    Descriptions = _context.MenuContents.Where(s => s.Type == (int)MenuContentType.Description && s.DateDeleted == null).Select(s => new MenuContentList
+                    Descriptions = _context.MenuContents.Where(s => s.Type == (int)MenuContentType.Description && s.MenuId == menu.Id && s.DateDeleted == null).Select(s => new MenuContentList
                     {
                         Id = s.Id,
                         MenuId = s.MenuId,
@@ -128,7 +137,7 @@ namespace CafeApi.Controllers
                     }).ToList(),
                     Like = _context.Likes.Any(s => s.UserId == valid.Id && s.MenuId == menu.Id && s.DateDeleted == null),
                     Bookmark = _context.Bookmarks.Any(s => s.UserId == valid.Id && s.MenuId == menu.Id && s.DateDeleted == null),
-                    Rating = _context.TransactionDetails.Join(_context.Reviews, s => s.Id, t => t.TransactionDetailId, (s, t) => new { s, t }).Where(st => st.s.MenuId == menu.Id).Average(st => st.t.Rating),
+                    Rating = rating,
                     Reviews = _context.TransactionDetails.Join(_context.Reviews, s => s.Id, t => t.TransactionDetailId, (s, t) => new { s, t }).Where(st => st.s.MenuId == menu.Id).Select(st => new ReviewList
                     {
                         Id = st.t.Id,
@@ -199,11 +208,11 @@ namespace CafeApi.Controllers
 
             if (page > 0 && pick > 0)
             {
-                if (android) return Ok(new { TotalUsers = st.Count(), TotalPages = totalPage, Users = st.Take((int)pick * (int)page).ToList() });
-                return Ok(new { TotalUsers = st.Count(), TotalPages = totalPage, Users = st.Skip(((int)pick * (int)page) - (int)pick).Take((int)pick).ToList() });
+                if (android) return Ok(new { TotalMenus = st.Count(), TotalPages = totalPage, Menus = st.Take((int)pick * (int)page).ToList() });
+                return Ok(new { TotalMenus = st.Count(), TotalPages = totalPage, Menus = st.Skip(((int)pick * (int)page) - (int)pick).Take((int)pick).ToList() });
             }
-            else if (pick > 0) return Ok(new { TotalUsers = st.Count(), TotalPages = totalPage, Users = st.Take((int)pick).ToList() });
-            else return Ok(new { TotalUsers = st.Count(), TotalPages = 1, Users = st.ToList() });
+            else if (pick > 0) return Ok(new { TotalMenus = st.Count(), TotalPages = totalPage, Menus = st.Take((int)pick).ToList() });
+            else return Ok(new { TotalMenus = st.Count(), TotalPages = 1, Menus = st.ToList() });
         }
 
         // GET: api/Menus/5
@@ -213,12 +222,12 @@ namespace CafeApi.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<Menu>> GetMenu(long id)
         {
-            var valid = Method.Decode(auth());
+            var valid = Method.valid(auth());
             if (!MenuExists(id)) return NotFound(new { errors = "Menu Not Found" });
 
             var menu = await _context.Menus.FindAsync(id);
             CategoryList? category = null;
-            if (menu.CategoryId.HasValue) category = await _context.Categories.Where(s => s.Id == menu.CategoryId && s.DateDeleted == null).Select(s => new CategoryList
+            category = await _context.Categories.Where(s => s.Id == menu.CategoryId && s.DateDeleted == null).Select(s => new CategoryList
             {
                 Id = s.Id,
                 ParentId = s.ParentId,
@@ -227,51 +236,60 @@ namespace CafeApi.Controllers
                 DateUpdated = s.DateUpdated
             }).FirstOrDefaultAsync();
 
-            return Ok(new MenuList
+            var rat = _context.TransactionDetails.Join(_context.Reviews, s => s.Id, t => t.TransactionDetailId, (s, t) => new { s, t }).Where(st => st.s.MenuId == menu.Id);
+            decimal? rating = null;
+            if (rat.Any()) rating = rat.Average(st => st.t.Rating);
+
+            var result = new
             {
-                Id = menu.Id,
-                CategoryId = category,
-                Name = menu.Name,
-                Price = menu.Price,
-                Stock = menu.Stock,
-                Sold = _context.TransactionDetails.Where(s => s.MenuId == menu.Id).Sum(s => s.Quantity),
-                Images = _context.MenuContents.Where(s => s.Type == (int)MenuContentType.Image && s.DateDeleted == null).Select(s => new MenuContentList
+                Menu = new MenuList
                 {
-                    Id = s.Id,
-                    MenuId = s.MenuId,
-                    Type = (MenuContentType)s.Type,
-                    TypeOrder = s.TypeOrder,
-                    Value = s.Value,
-                    DateCreated = s.DateCreated,
-                    DateUpdated = s.DateUpdated
-                }).ToList(),
-                Descriptions = _context.MenuContents.Where(s => s.Type == (int)MenuContentType.Description && s.DateDeleted == null).Select(s => new MenuContentList
-                {
-                    Id = s.Id,
-                    MenuId = s.MenuId,
-                    Type = (MenuContentType)s.Type,
-                    TypeOrder = s.TypeOrder,
-                    Value = s.Value,
-                    DateCreated = s.DateCreated,
-                    DateUpdated = s.DateUpdated
-                }).ToList(),
-                Like = _context.Likes.Any(s => s.UserId == valid.Id && s.MenuId == menu.Id && s.DateDeleted == null),
-                Bookmark = _context.Bookmarks.Any(s => s.UserId == valid.Id && s.MenuId == menu.Id && s.DateDeleted == null),
-                Rating = _context.TransactionDetails.Join(_context.Reviews, s => s.Id, t => t.TransactionDetailId, (s , t) => new {s, t}).Where(st => st.s.MenuId == menu.Id).Average(st => st.t.Rating),
-                Reviews = _context.TransactionDetails.Join(_context.Reviews, s => s.Id, t => t.TransactionDetailId, (s, t) => new { s, t }).Where(st => st.s.MenuId == menu.Id).Select(st => new ReviewList
-                {
-                    Id = st.t.Id,
-                    UserId = st.t.UserId,
-                    TransactionDetailId = st.t.TransactionDetailId,
-                    Rating = st.t.Rating,
-                    Description = st.t.Description,
-                    DateCreated = st.t.DateCreated,
-                    DateUpdated = st.t.DateUpdated
-                }).ToList(),
-                DateCreated = menu.DateCreated,
-                DateUpdated = menu.DateUpdated,
-                DateDeleted = menu.DateDeleted
-            });
+                    Id = menu.Id,
+                    CategoryId = category,
+                    Name = menu.Name,
+                    Price = menu.Price,
+                    Stock = menu.Stock,
+                    Sold = _context.TransactionDetails.Where(s => s.MenuId == menu.Id).Sum(s => s.Quantity),
+                    Images = _context.MenuContents.Where(s => s.Type == (int)MenuContentType.Image && s.MenuId == menu.Id && s.DateDeleted == null).Select(s => new MenuContentList
+                    {
+                        Id = s.Id,
+                        MenuId = s.MenuId,
+                        Type = (MenuContentType)s.Type,
+                        TypeOrder = s.TypeOrder,
+                        Value = s.Value,
+                        DateCreated = s.DateCreated,
+                        DateUpdated = s.DateUpdated
+                    }).ToList(),
+                    Descriptions = _context.MenuContents.Where(s => s.Type == (int)MenuContentType.Description && s.MenuId == menu.Id && s.DateDeleted == null).Select(s => new MenuContentList
+                    {
+                        Id = s.Id,
+                        MenuId = s.MenuId,
+                        Type = (MenuContentType)s.Type,
+                        TypeOrder = s.TypeOrder,
+                        Value = s.Value,
+                        DateCreated = s.DateCreated,
+                        DateUpdated = s.DateUpdated
+                    }).ToList(),
+                    Like = _context.Likes.Any(s => s.UserId == valid.Id && s.MenuId == menu.Id && s.DateDeleted == null),
+                    Bookmark = _context.Bookmarks.Any(s => s.UserId == valid.Id && s.MenuId == menu.Id && s.DateDeleted == null),
+                    Rating = rating,
+                    Reviews = _context.TransactionDetails.Join(_context.Reviews, s => s.Id, t => t.TransactionDetailId, (s, t) => new { s, t }).Where(st => st.s.MenuId == menu.Id).Select(st => new ReviewList
+                    {
+                        Id = st.t.Id,
+                        UserId = st.t.UserId,
+                        TransactionDetailId = st.t.TransactionDetailId,
+                        Rating = st.t.Rating,
+                        Description = st.t.Description,
+                        DateCreated = st.t.DateCreated,
+                        DateUpdated = st.t.DateUpdated
+                    }).ToList(),
+                    DateCreated = menu.DateCreated,
+                    DateUpdated = menu.DateUpdated,
+                    DateDeleted = menu.DateDeleted
+                }
+            };
+
+            return Ok(result);
         }
 
         // PUT: api/Menus/5
@@ -285,7 +303,7 @@ namespace CafeApi.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> PutMenu(long id, MenuParameter menuParameter)
         {
-            var valid = Method.Decode(auth());
+            var valid = Method.valid(auth());
             if (!valid.IsValid) return StatusCode(401, new { errors = "Access Unauthorized!" });
             if (valid.Role != UserRole.Admin) return StatusCode(403, new { errors = "User Role must be Admin!" });
             if (!ModelState.IsValid) return BadRequest(Method.error(ModelState));
@@ -363,7 +381,7 @@ namespace CafeApi.Controllers
         [ProducesResponseType(StatusCodes.Status409Conflict)]
         public async Task<ActionResult<Menu>> PostMenu([FromForm] MenuParameter menuParameter)
         {
-            var valid = Method.Decode(auth());
+            var valid = Method.valid(auth());
             if (!valid.IsValid) return StatusCode(401, new { errors = "Access Unauthorized!" });
             if (valid.Role != UserRole.Admin) return StatusCode(403, new { errors = "User Role must be Admin!" });
             if (!ModelState.IsValid) return BadRequest(Method.error(ModelState));
@@ -434,7 +452,7 @@ namespace CafeApi.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteMenu(long id)
         {
-            var valid = Method.Decode(auth());
+            var valid = Method.valid(auth());
             if (!valid.IsValid) return StatusCode(401, new { errors = "Access Unauthorized!" });
             if (valid.Role != UserRole.Admin) return StatusCode(403, new { errors = "User Role must be Admin!" });
             if (!MenuExists(id)) NotFound(new { errors = "Menu Not Found!" });

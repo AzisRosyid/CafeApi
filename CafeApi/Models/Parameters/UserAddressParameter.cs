@@ -1,10 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using System.ComponentModel.DataAnnotations;
-using static CafeApi.Models.Enum.UserAddressEnum;
-using static CafeApi.Models.Enum.UserEnum;
+using static CafeApi.Models.Enums.UserAddressEnum;
 
-namespace CafeApi.Models.Parameter
+namespace CafeApi.Models.Parameters
 {
     public class UserAddressParameter
     {

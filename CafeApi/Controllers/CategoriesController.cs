@@ -6,12 +6,13 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using CafeApi.Models;
-using CafeApi.Models.List;
-using static CafeApi.Models.Enum.UserEnum;
-using CafeApi.Models.Parameter;
-using static CafeApi.Models.Enum.OrderEnum;
-using static CafeApi.Models.Enum.DeleteEnum;
-using static CafeApi.Models.Enum.CategoryEnum;
+using CafeApi.Models.Lists;
+using static CafeApi.Models.Enums.UserEnum;
+using CafeApi.Models.Parameters;
+using static CafeApi.Models.Enums.OrderEnum;
+using static CafeApi.Models.Enums.DeleteEnum;
+using static CafeApi.Models.Enums.CategoryEnum;
+using CafeApi.Controllers.Helpers;
 
 namespace CafeApi.Controllers
 {
@@ -32,7 +33,7 @@ namespace CafeApi.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<IEnumerable<Category>>> GetCategories(int? page = 1, int? pick = 20, string search = "", long? parent = null, Delete? deleted = null, CategorySort? sort = null, Order? order = null, DateTime? createStart = null, DateTime? createEnd = null, DateTime? updateStart = null, DateTime? updateEnd = null, bool android = false)
         {
-            var valid = Method.Decode(auth());
+            var valid = Method.valid(auth());
 
             var st = _context.Categories.Where(s => s.Id.ToString().Contains(search) || s.ParentId.ToString().Contains(search) || s.Name.Contains(search) || s.DateCreated.ToString().Contains(search) || s.DateUpdated.ToString().Contains(search) || s.DateDeleted.ToString().Contains(search)).Select(s => new CategoryList
             {
@@ -74,11 +75,11 @@ namespace CafeApi.Controllers
 
             if (page > 0 && pick > 0)
             {
-                if (android) return Ok(new { TotalUsers = st.Count(), TotalPages = totalPage, Users = st.Take((int)pick * (int)page).ToList() });
-                return Ok(new { TotalUsers = st.Count(), TotalPages = totalPage, Users = st.Skip(((int)pick * (int)page) - (int)pick).Take((int)pick).ToList() });
+                if (android) return Ok(new { TotalCategories = st.Count(), TotalPages = totalPage, Categories = st.Take((int)pick * (int)page).ToList() });
+                return Ok(new { TotalCategories = st.Count(), TotalPages = totalPage, Categories = st.Skip(((int)pick * (int)page) - (int)pick).Take((int)pick).ToList() });
             }
-            else if (pick > 0) return Ok(new { TotalUsers = st.Count(), TotalPages = totalPage, Users = st.Take((int)pick).ToList() });
-            else return Ok(new { TotalUsers = st.Count(), TotalPages = 1, Users = st.ToList() });
+            else if (pick > 0) return Ok(new { TotalCategories = st.Count(), TotalPages = totalPage, Categories = st.Take((int)pick).ToList() });
+            else return Ok(new { TotalCategories = st.Count(), TotalPages = 1, Categories = st.ToList() });
         }
 
         // GET: api/Categories/5
@@ -88,21 +89,26 @@ namespace CafeApi.Controllers
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<ActionResult<Category>> GetCategory(long id)
         {
-            var valid = Method.Decode(auth());
+            var valid = Method.valid(auth());
             if (!CategoryExists(id)) return NotFound(new { errors = "Category Not Found!" });
             var category = await _context.Categories.FindAsync(id);
 
             if (category.DateDeleted != null && valid.Role != UserRole.Admin) return StatusCode(403, new { errors = "User Role must be Admin!" });
 
-            return Ok(new CategoryList
+            var result = new
             {
-                Id = category.Id,
-                ParentId = category.ParentId,
-                Name = category.Name,
-                DateCreated = category.DateCreated,
-                DateUpdated = category.DateUpdated,
-                DateDeleted = category.DateDeleted
-            });
+                Category = new CategoryList
+                {
+                    Id = category.Id,
+                    ParentId = category.ParentId,
+                    Name = category.Name,
+                    DateCreated = category.DateCreated,
+                    DateUpdated = category.DateUpdated,
+                    DateDeleted = category.DateDeleted
+                }
+            };
+
+            return Ok(result);
         }
 
         // PUT: api/Categories/5
@@ -115,7 +121,7 @@ namespace CafeApi.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> PutCategory(long id, CategoryParameter categoryParameter)
         {
-            var valid = Method.Decode(auth());
+            var valid = Method.valid(auth());
             if (!valid.IsValid) return Unauthorized(new { errors = "Access Unauthorized!" });
             if (valid.Role != UserRole.Admin) return StatusCode(403, new { errors = "User Role must be Admin!" });
             if (!ModelState.IsValid) return BadRequest(Method.error(ModelState));
@@ -141,7 +147,7 @@ namespace CafeApi.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<ActionResult<Category>> PostCategory(CategoryParameter categoryParameter)
         {
-            var valid = Method.Decode(auth());
+            var valid = Method.valid(auth());
             if (!valid.IsValid) return Unauthorized(new { errors = "Access Unauthorized!" }); 
             if (valid.Role != UserRole.Admin) return StatusCode(403, new { errors = "User Role must be Admin!" }); 
             if (!ModelState.IsValid) return BadRequest(Method.error(ModelState));
@@ -165,7 +171,7 @@ namespace CafeApi.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> DeleteCategory(long id)
         {
-            var valid = Method.Decode(auth());
+            var valid = Method.valid(auth());
             if (!valid.IsValid) return StatusCode(401, new { errors = "Access Unauthorized!" });
             if (valid.Role != UserRole.Admin) return StatusCode(403, new { errors = "User Role must be Admin!" });
             if (!CategoryExists(id)) NotFound(new { errors = "Category Not Found!" });
